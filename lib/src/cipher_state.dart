@@ -48,14 +48,15 @@ class CipherState {
   ///
   /// The [Noise specification](https://noiseprotocol.org/noise.html) refers to
   /// this with _decryptAd_.
-  Future<List<int>> decrypt(List<int> cipherText, {List<int> aad}) async {
+  // Future<List<int>> decrypt(List<int> cipherText, {List<int> aad}) async {
+  Future<List<int>> decrypt(List<int> cipherText,
+      {List<int> aad, Mac mac}) async {
     if (_secretKey == null) {
       return cipherText;
     }
     final result = await cipher.implementation.decrypt(
-      cipherText,
+      SecretBox(cipherText, nonce: cipher.nonce(counter), mac: mac),
       secretKey: _secretKey,
-      nonce: cipher.nonce(counter),
       aad: aad,
     );
     _counter++;
@@ -70,9 +71,10 @@ class CipherState {
   ///
   /// The [Noise specification](https://noiseprotocol.org/noise.html) refers to
   /// this with _encryptAd_.
-  Future<List<int>> encrypt(List<int> plainText, {List<int> aad}) async {
+  Future<SecretBox> encrypt(List<int> plainText, {List<int> aad}) async {
     if (_secretKey == null) {
-      return plainText;
+      return null; // TODO: check
+      // return plainText;
     }
     final result = await cipher.implementation.encrypt(
       plainText,

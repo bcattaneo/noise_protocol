@@ -22,23 +22,28 @@ part of noise_protocol;
 ///
 class NoiseCipher {
   /// AES-GCM
-  static const NoiseCipher aesGcm = NoiseCipher._(
+  // static const NoiseCipher aesGcm = NoiseCipher._(
+  static NoiseCipher aesGcm = NoiseCipher._(
     'AESGCM',
-    cryptography.aesGcm,
+    // cryptography.aesGcm,
+    cryptography.AesGcm
+        .with128bits(), // TODO: check whether it's 128 bits or more
   );
 
   /// ChaCha20-Poly1305-AEAD
-  static const NoiseCipher chachaPoly = NoiseCipher._(
+  static NoiseCipher chachaPoly = NoiseCipher._(
     'ChaChaPoly',
-    cryptography.chacha20Poly1305Aead,
+    cryptography.Chacha20.poly1305Aead(),
   );
 
   /// Name of the algorithm.
   final String name;
 
   /// Implementation.
-  final Cipher implementation;
+  // final Cipher implementation;
+  final StreamingCipher implementation;
 
+  // const NoiseCipher._(this.name, this.implementation);
   const NoiseCipher._(this.name, this.implementation);
 
   /// Generates a nonce from a counter value.
