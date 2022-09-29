@@ -14,24 +14,30 @@
 
 part of noise_protocol;
 
-class HandshakeResult {
-  /// Parameters for encrypting sent messages.
-  final CipherState encryptingState;
+class NoiseMessagePattern {
+  final List<NoiseMessageToken> tokens;
 
-  /// Parameters for decrypting received messages.
-  final CipherState decryptingState;
-
-  HandshakeResult({
-    required this.encryptingState,
-    required this.decryptingState,
-  });
+  const NoiseMessagePattern(this.tokens);
 
   @override
-  int get hashCode => encryptingState.hashCode ^ decryptingState.hashCode;
+  int get hashCode => const ListEquality<NoiseMessageToken>().hash(tokens);
 
   @override
   bool operator ==(other) =>
-      other is HandshakeResult &&
-      encryptingState == other.encryptingState &&
-      decryptingState == other.decryptingState;
+      other is NoiseMessagePattern &&
+      const ListEquality<NoiseMessageToken>().equals(tokens, other.tokens);
+
+  @override
+  String toString() => 'NoiseMessagePattern([${tokens.join(',')}])';
+}
+
+/// A message token.
+enum NoiseMessageToken {
+  e,
+  s,
+  ee,
+  es,
+  se,
+  ss,
+  psk,
 }
