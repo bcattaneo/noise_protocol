@@ -1,3 +1,4 @@
+// Copyright 2022 Bruno Cattáneo (https://cattaneo.uy).
 // Copyright 2019 Gohilla Ltd (https://gohilla.com).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cryptography/src/utils.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:noise_protocol/noise_protocol.dart';
 
 Future<void> main() async {
+  // Generate new keys for both states
+  final algorithm = Ed25519();
+  var localKeyPair = await algorithm.newKeyPair();
+  var remoteKeyPair = await algorithm.newKeyPair();
+  var localStaticPublicKey = await localKeyPair.extractPublicKey();
+  var remoteStaticPublicKey = await remoteKeyPair.extractPublicKey();
+
   final protocol = NoiseProtocol(
-    handshakePattern: HandshakePattern.xx,
-    keyExchangeAlgorithm: NoiseKeyExchangeAlgorithm.x25519,
-    cipher: NoiseCipher.chachaPoly,
-    hashAlgorithm: NoiseHashAlgorithm.blake2s,
+    handshakePattern: NoiseHandshakePattern.xx,
+    noiseKeyExchangeAlgorithm: NoiseKeyExchangeAlgorithm.x25519,
+    cipher: NoiseCipher.aesGcm,
+    hashAlgorithm: NoiseHashAlgorithm.sha256,
   );
 
   // A buffer for messages
@@ -28,20 +38,25 @@ Future<void> main() async {
   // Handshake states
   final localHandshakeState = HandshakeState(
     protocol: protocol,
-    authenticator: NoiseAuthenticator(
+    authenticator: NoiseAuthenticationParameters(
         // You can fix local/remote keys here
-        ),
+        localStaticKeyPair: localKeyPair,
+        remoteStaticPublicKey: remoteStaticPublicKey),
   );
   final remoteHandshakeState = HandshakeState(
     protocol: protocol,
-    authenticator: NoiseAuthenticator(),
+    authenticator: NoiseAuthenticationParameters(
+        localStaticKeyPair: remoteKeyPair,
+        remoteStaticPublicKey: localStaticPublicKey),
   );
 
   // Let's do a handshake with KK pattern
   await localHandshakeState.initialize(
+    // localEphemeralKeyPair: localKeyPair,
     isInitiator: true,
   );
   await remoteHandshakeState.initialize(
+    // localEphemeralKeyPair: remoteKeyPair,
     isInitiator: false,
   );
 
@@ -51,6 +66,7 @@ Future<void> main() async {
     payload: [1, 2, 3], // Should contain be unique to prevent replay attacks
   );
   await remoteHandshakeState.readMessage(
+    onPayload: (payload) => print('Got payload: $payload'),
     message: buffer,
   );
   print('Local --> remote: ${hexFromBytes(buffer)}');
@@ -68,31 +84,34 @@ Future<void> main() async {
   buffer.clear();
 
   // local --> remote
-  final localState = await localHandshakeState.writeMessage(
+  final localState = (await localHandshakeState.writeMessage(
     messageBuffer: buffer,
-  );
-  final remoteState = await remoteHandshakeState.readMessage(
+  ))!;
+  final remoteState = (await remoteHandshakeState.readMessage(
     message: buffer,
-  );
+  ))!;
 
   print('Local --> remote: ${hexFromBytes(buffer)}');
   print('');
   buffer.clear();
 
   {
-    final keyForSending = localState.encryptingState.secretKey.extractSync();
-    final keyForReceiving = localState.decryptingState.secretKey.extractSync();
+    final keyForSending = await localState.encryptingState.secretKey!.extract();
+    final keyForReceiving =
+        await localState.decryptingState.secretKey!.extract();
     print('Local keys:');
-    print('  Sending: ${hexFromBytes(keyForSending)}');
-    print('  Receiving: ${hexFromBytes(keyForReceiving)}');
+    print('  Sending: ${hexFromBytes(keyForSending.bytes)}');
+    print('  Receiving: ${hexFromBytes(keyForReceiving.bytes)}');
   }
   {
-    final keyForSending = remoteState.encryptingState.secretKey.extractSync();
-    final keyForReceiving = remoteState.decryptingState.secretKey.extractSync();
+    final keyForSending =
+        await remoteState.encryptingState.secretKey!.extract();
+    final keyForReceiving =
+        await remoteState.decryptingState.secretKey!.extract();
     print('');
     print('Remote keys:');
-    print('  Sending: ${hexFromBytes(keyForSending)}');
-    print('  Receiving: ${hexFromBytes(keyForReceiving)}');
+    print('  Sending: ${hexFromBytes(keyForSending.bytes)}');
+    print('  Receiving: ${hexFromBytes(keyForReceiving.bytes)}');
   }
 
   // Now both parties have:
